@@ -1,9 +1,217 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Index</title>
-  </head>
-  <body>
-    <p>Hello, World!</p>
-  </body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Animated Avatar Text-to-Speech</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #232526 0%, #414345 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      color: #fff;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 400px;
+      padding: 2rem 1rem;
+      background: rgba(30, 30, 40, 0.7);
+      border-radius: 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    .avatar-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 2rem;
+      width: 180px;
+      height: 180px;
+    }
+    .avatar {
+      width: 160px;
+      height: 160px;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      /* For animation scaling */
+      transition: transform 0.2s cubic-bezier(.4,2,.6,1);
+    }
+    /* Cartoon avatar using SVG */
+    .avatar-face {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    /* Mouth animation */
+    .mouth {
+      transform-origin: 50% 50%;
+      transition: d 0.1s;
+    }
+    .mouth.speaking {
+      animation: mouth-move 0.18s infinite;
+    }
+    @keyframes mouth-move {
+      0%   { transform: scaleY(1); }
+      50%  { transform: scaleY(1.7); }
+      100% { transform: scaleY(1); }
+    }
+    /* Head bobbing animation */
+    .avatar.speaking {
+      animation: head-bob 0.5s infinite alternate;
+    }
+    @keyframes head-bob {
+      0%   { transform: translateY(0px) scale(1.03); }
+      100% { transform: translateY(8px) scale(1); }
+    }
+    .tts-controls {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .tts-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      border: none;
+      font-size: 1.1rem;
+      background: #232526;
+      color: #fff;
+      outline: none;
+      box-sizing: border-box;
+      transition: background 0.2s;
+    }
+    .tts-input:focus {
+      background: #2c2f34;
+    }
+    .tts-btn {
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(100,100,255,0.08);
+      transition: background 0.2s, transform 0.1s;
+    }
+    .tts-btn:hover, .tts-btn:focus {
+      background: linear-gradient(90deg, #fc5c7d 0%, #6a82fb 100%);
+      transform: scale(1.04);
+      outline: none;
+    }
+    @media (max-width: 600px) {
+      .container {
+        max-width: 98vw;
+        padding: 1rem 0.5rem;
+      }
+      .avatar-wrapper {
+        width: 120px;
+        height: 120px;
+      }
+      .avatar {
+        width: 100px;
+        height: 100px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="avatar-wrapper">
+      <div class="avatar" id="avatar">
+        <!-- Simple SVG cartoon face -->
+        <svg class="avatar-face" viewBox="0 0 160 160">
+          <ellipse cx="80" cy="80" rx="70" ry="75" fill="#ffe0b2" stroke="#d1a87c" stroke-width="3"/>
+          <!-- Eyes -->
+          <ellipse cx="55" cy="75" rx="10" ry="14" fill="#fff"/>
+          <ellipse cx="105" cy="75" rx="10" ry="14" fill="#fff"/>
+          <ellipse cx="55" cy="80" rx="4" ry="6" fill="#222"/>
+          <ellipse cx="105" cy="80" rx="4" ry="6" fill="#222"/>
+          <!-- Eyebrows -->
+          <rect x="45" y="60" width="20" height="4" rx="2" fill="#b48a6e"/>
+          <rect x="95" y="60" width="20" height="4" rx="2" fill="#b48a6e"/>
+          <!-- Nose -->
+          <ellipse cx="80" cy="95" rx="7" ry="4" fill="#e0b07c"/>
+          <!-- Mouth (animated) -->
+          <ellipse id="mouth" class="mouth" cx="80" cy="120" rx="18" ry="7" fill="#e57373"/>
+        </svg>
+      </div>
+    </div>
+    <form class="tts-controls" id="ttsForm" autocomplete="off">
+      <input class="tts-input" id="ttsInput" type="text" maxlength="200" placeholder="Type something to say..." required>
+      <button class="tts-btn" type="submit">Speak</button>
+    </form>
+  </div>
+  <script>
+    const ttsForm = document.getElementById('ttsForm');
+    const ttsInput = document.getElementById('ttsInput');
+    const avatar = document.getElementById('avatar');
+    const mouth = document.getElementById('mouth');
+
+    let utterance = null;
+    let speaking = false;
+
+    function startSpeaking(text) {
+      if (!window.speechSynthesis) {
+        alert('Sorry, your browser does not support speech synthesis.');
+        return;
+      }
+      if (speaking) {
+        window.speechSynthesis.cancel();
+      }
+      utterance = new window.SpeechSynthesisUtterance(text);
+      // Try to pick a more human-like voice if available
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('natural'));
+      if (preferred) utterance.voice = preferred;
+      else if (voices.length) utterance.voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.onstart = () => {
+        speaking = true;
+        avatar.classList.add('speaking');
+        mouth.classList.add('speaking');
+      };
+      utterance.onend = utterance.onerror = () => {
+        speaking = false;
+        avatar.classList.remove('speaking');
+        mouth.classList.remove('speaking');
+      };
+      window.speechSynthesis.speak(utterance);
+    }
+
+    ttsForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const text = ttsInput.value.trim();
+      if (text.length === 0) return;
+      startSpeaking(text);
+    });
+
+    // On mobile, unlock speech synthesis voices
+    window.speechSynthesis.onvoiceschanged = () => {};
+
+    // Optional: tap avatar to repeat last spoken text
+    avatar.addEventListener('click', () => {
+      if (ttsInput.value.trim()) {
+        startSpeaking(ttsInput.value.trim());
+      }
+    });
+  </script>
+</body>
 </html>
