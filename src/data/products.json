@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "name": "Wireless Headphones",
+    "image": "/assets/headphones.jpg",
+    "price": 59.99,
+    "rating": 4.5,
+    "category": "Electronics",
+    "stock": 12,
+    "description": "High-quality sound, noise cancellation, 20h battery."
+  },
+  {
+    "id": 2,
+    "name": "Smart Watch",
+    "image": "/assets/smartwatch.jpg",
+    "price": 89.99,
+    "rating": 4.2,
+    "category": "Wearables",
+    "stock": 8,
+    "description": "Track fitness, notifications, and more."
+  }
+  // ...more products
+]
