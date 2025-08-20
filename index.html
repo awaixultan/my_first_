@@ -156,6 +156,7 @@
     <form class="tts-controls" id="ttsForm" autocomplete="off">
       <input class="tts-input" id="ttsInput" type="text" maxlength="200" placeholder="Type something to say..." required>
       <button class="tts-btn" type="submit">Speak</button>
+      <button class="tts-btn" type="button" id="downloadBtn" style="display:none;">Download</button>
     </form>
   </div>
   <script>
@@ -163,9 +164,70 @@
     const ttsInput = document.getElementById('ttsInput');
     const avatar = document.getElementById('avatar');
     const mouth = document.getElementById('mouth');
+    const downloadBtn = document.getElementById('downloadBtn');
 
     let utterance = null;
     let speaking = false;
+    let lastSpokenText = '';
+    let audioBlob = null;
+
+    // Helper: Speak and record audio
+    async function speakAndRecord(text) {
+      if (!window.speechSynthesis || !window.MediaRecorder) {
+        alert('Sorry, your browser does not support audio recording for TTS.');
+        return;
+      }
+      // Clean up previous audio
+      audioBlob = null;
+      downloadBtn.style.display = 'none';
+
+      // Create audio context and destination
+      const synth = window.speechSynthesis;
+      const utter = new window.SpeechSynthesisUtterance(text);
+      const voices = synth.getVoices();
+      const preferred = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('natural'));
+      if (preferred) utter.voice = preferred;
+      else if (voices.length) utter.voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+      utter.rate = 1;
+      utter.pitch = 1;
+
+      // Create audio context and destination node
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const dest = audioCtx.createMediaStreamDestination();
+
+      // Patch speech synthesis to output to audio context
+      const utterClone = new window.SpeechSynthesisUtterance(text);
+      utterClone.voice = utter.voice;
+      utterClone.rate = utter.rate;
+      utterClone.pitch = utter.pitch;
+
+      // Use the browser's speech synthesis output, but we can't directly route it to MediaStream.
+      // Workaround: Use the SpeechSynthesisUtterance and capture system audio via getDisplayMedia or getUserMedia.
+      // For privacy and compatibility, we'll use getDisplayMedia (user must allow tab audio capture).
+      // This is a workaround; direct capture is not possible in browsers as of 2024.
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, sampleRate: 44100 },
+          video: false
+        });
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        let chunks = [];
+        mediaRecorder.ondataavailable = e => chunks.push(e.data);
+        mediaRecorder.onstop = () => {
+          audioBlob = new Blob(chunks, { type: 'audio/webm' });
+          downloadBtn.style.display = 'inline-block';
+          stream.getTracks().forEach(track => track.stop());
+        };
+        mediaRecorder.start();
+        // Speak
+        utter.onend = () => {
+          setTimeout(() => mediaRecorder.stop(), 200); // Wait a bit to ensure all audio is captured
+        };
+        synth.speak(utter);
+      } catch (err) {
+        alert('Audio capture was denied or failed. Cannot record audio for download.');
+      }
+    }
 
     function startSpeaking(text) {
       if (!window.speechSynthesis) {
@@ -176,7 +238,6 @@
         window.speechSynthesis.cancel();
       }
       utterance = new window.SpeechSynthesisUtterance(text);
-      // Try to pick a more human-like voice if available
       const voices = window.speechSynthesis.getVoices();
       const preferred = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('natural'));
       if (preferred) utterance.voice = preferred;
@@ -200,7 +261,9 @@
       e.preventDefault();
       const text = ttsInput.value.trim();
       if (text.length === 0) return;
+      lastSpokenText = text;
       startSpeaking(text);
+      speakAndRecord(text);
     });
 
     // On mobile, unlock speech synthesis voices
@@ -209,7 +272,24 @@
     // Optional: tap avatar to repeat last spoken text
     avatar.addEventListener('click', () => {
       if (ttsInput.value.trim()) {
+        lastSpokenText = ttsInput.value.trim();
         startSpeaking(ttsInput.value.trim());
+        speakAndRecord(ttsInput.value.trim());
+      }
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      if (audioBlob) {
+        const url = URL.createObjectURL(audioBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'tts-audio.webm';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
       }
     });
   </script>
