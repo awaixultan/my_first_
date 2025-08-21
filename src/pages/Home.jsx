@@ -18,7 +18,7 @@ export default function Home({ onAddToCart }) {
 
       {/* Categories */}
       <section className="container mx-auto py-10">
-        <h2 className="text-2xl font-bold mb-6 text-primary">Categories</h2>
+        <h2 className="text-2xl font-bold mb-6 text-primary">Products</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {categories.map(cat => (
             <div key={cat} className="bg-white rounded-lg shadow p-4 text-center font-semibold hover:bg-primary hover:text-white transition">{cat}</div>
